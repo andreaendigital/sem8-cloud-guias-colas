@@ -38,7 +38,8 @@ import java.util.stream.Collectors;
  * @see JwtUtil
  * @see OncePerRequestFilter
  */
-@Component
+// TODO: Reactivar para Experiencia 2 — descomentar @Component
+// @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";

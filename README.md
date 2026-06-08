@@ -164,9 +164,9 @@ Job 2: deploy-ec2
 | Método   | Ruta                              | Descripción              | Auth       |
 |----------|-----------------------------------|--------------------------|------------|
 | `POST`   | `/api/v1/guias`                   | Crear guía               | No         |
-| `POST`   | `/api/v1/guias/{guiaId}/upload`   | Subida manual a S3       | Bearer JWT |
-| `GET`    | `/api/v1/guias/{guiaId}/download` | Descargar PDF (redirect) | Bearer JWT |
-| `PUT`    | `/api/v1/guias/{guiaId}`          | Actualizar guía          | Bearer JWT |
-| `DELETE` | `/api/v1/guias/{guiaId}`          | Eliminar guía            | JWT ADMIN  |
-| `GET`    | `/api/v1/guias`                   | Consultar paginado       | Bearer JWT |
+| `POST`   | `/api/v1/guias/{guiaId}/upload`   | Subida manual a S3       | No         |
+| `GET`    | `/api/v1/guias/{guiaId}/download` | Descargar PDF (redirect) | No         |
+| `PUT`    | `/api/v1/guias/{guiaId}`          | Actualizar guía          | No         |
+| `DELETE` | `/api/v1/guias/{guiaId}`          | Eliminar guía            | No         |
+| `GET`    | `/api/v1/guias`                   | Consultar paginado       | No         |
 | `GET`    | `/actuator/health`                | Health check             | No         |

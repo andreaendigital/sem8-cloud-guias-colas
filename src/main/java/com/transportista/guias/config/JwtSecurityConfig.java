@@ -1,12 +1,12 @@
 package com.transportista.guias.config;
 
-import com.transportista.guias.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-// import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+// import com.transportista.guias.security.JwtAuthFilter;         // TODO: Reactivar Experiencia 2
+// import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter; // TODO: Reactivar Experiencia 2
 
 /**
  * Configuración de seguridad — MODO DESARROLLO (seguridad JWT desactivada).
