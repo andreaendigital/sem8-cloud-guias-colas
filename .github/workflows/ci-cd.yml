@@ -82,13 +82,18 @@ jobs:
               -e AWS_REGION=${{ secrets.AWS_REGION }} \
               -e S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }} \
               -e EFS_MOUNT_PATH=/mnt/efs/guias \
-              -e DB_URL=${{ secrets.DB_URL }} \
+              -e DB_URL="${{ secrets.DB_URL }}" \
               -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
               -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-              #-e JWT_SECRET=${{ secrets.JWT_SECRET }} \
               ${{ secrets.DOCKERHUB_USERNAME }}/guias-despacho:latest
 
             # 4. Esperar arranque y verificar health check
             sleep 60
-            curl --fail http://localhost:8080/actuator/health
+            
+            # 5. Verificar salud y mostrar logs si falla
+            if ! curl --fail http://localhost:8080/actuator/health; then
+              echo "El contenedor falló al iniciar. Mostrando logs:"
+              docker logs guias-app
+              exit 1
+            fi
             echo "Despliegue exitoso: $(docker inspect --format='{{.Id}}' guias-app | cut -c1-12)"
