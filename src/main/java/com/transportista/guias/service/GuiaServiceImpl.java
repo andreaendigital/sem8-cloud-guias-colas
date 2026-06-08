@@ -207,10 +207,11 @@ public class GuiaServiceImpl implements GuiaService {
         }
 
         // 5.4 — Verificar permiso del token sobre el transportistaId
-        List<String> permitidos = jwtUtil.extractTransportistasPermitidos(jwtToken);
-        if (!permitidos.contains(guia.getTransportistaId())) {
-            throw new AccessDeniedException("No tiene permisos para descargar esta guía");
-        }
+        // TODO: Reactivar para Experiencia 2 — verificación de transportistasPermitidos
+        // List<String> permitidos = jwtUtil.extractTransportistasPermitidos(jwtToken);
+        // if (!permitidos.contains(guia.getTransportistaId())) {
+        //     throw new AccessDeniedException("No tiene permisos para descargar esta guía");
+        // }
 
         // 5.2 — Generar URL pre-firmada y redirigir (HTTP 302)
         try {
@@ -289,11 +290,11 @@ public class GuiaServiceImpl implements GuiaService {
      */
     @Override
     public void eliminarGuia(UUID guiaId, String jwtToken) {
-        // 7.7 — Verificar rol ADMIN
-        List<String> roles = jwtUtil.extractRoles(jwtToken);
-        if (!roles.contains("ROLE_ADMIN")) {
-            throw new AccessDeniedException("No tiene permisos para eliminar guías");
-        }
+        // TODO: Reactivar para Experiencia 2 — verificación de rol ADMIN via JWT
+        // List<String> roles = jwtUtil.extractRoles(jwtToken);
+        // if (!roles.contains("ROLE_ADMIN")) {
+        //     throw new AccessDeniedException("No tiene permisos para eliminar guías");
+        // }
 
         // 7.5 — Verificar existencia
         Guia guia = guiaRepository.findById(guiaId)
