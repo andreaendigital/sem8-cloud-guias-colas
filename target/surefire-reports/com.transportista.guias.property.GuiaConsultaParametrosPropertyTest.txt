@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.transportista.guias.property.GuiaConsultaParametrosPropertyTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.075 s -- in com.transportista.guias.property.GuiaConsultaParametrosPropertyTest

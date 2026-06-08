@@ -1,0 +1,4 @@
+com\transportista\guias\property\GuiaActualizacionCamposPropertyTest.class
+com\transportista\guias\property\GuiaConsultaParametrosPropertyTest.class
+com\transportista\guias\property\GuiaPaginacionPropertyTest.class
+com\transportista\guias\property\GuiaPaginacionInvalidaPropertyTest.class

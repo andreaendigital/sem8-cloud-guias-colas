@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.transportista.guias.property.GuiaActualizacionCamposPropertyTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.531 s -- in com.transportista.guias.property.GuiaActualizacionCamposPropertyTest

@@ -1,0 +1,49 @@
+version: '3.9'
+
+services:
+  # ──────────────────────────────────────────
+  # Microservicio Guías de Despacho
+  # ──────────────────────────────────────────
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Base de datos H2 en memoria (desarrollo local)
+      DB_URL: jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1
+      DB_USERNAME: sa
+      DB_PASSWORD: ""
+      # JWT (clave de desarrollo)
+      # TODO: Reactivar para Experiencia 2
+      # JWT_SECRET: dev-secret-key-min-32-chars-long!!
+      # AWS / LocalStack
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: us-east-1
+      #AWS_ENDPOINT_OVERRIDE: http://localstack:4566
+      S3_BUCKET_NAME: guias-local
+      # Almacenamiento temporal de PDFs (EFS simulado localmente)
+      EFS_MOUNT_PATH: /tmp/efs-local
+      # Thread pool PDF
+      PDF_ASYNC_POOL_SIZE: 4
+    #depends_on:
+     # localstack:
+      #  condition: service_healthy
+    volumes:
+      - /tmp/efs-local:/tmp/efs-local
+
+  # ──────────────────────────────────────────
+  # LocalStack — simula Amazon S3 localmente
+  # ──────────────────────────────────────────
+  localstack:
+    image: localstack/localstack:3.0
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

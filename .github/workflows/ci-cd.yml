@@ -1,0 +1,93 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Job 1: Tests → Build → Push imagen a Docker Hub
+  # ─────────────────────────────────────────────────────────────
+  test-build-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código fuente
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Ejecutar pruebas unitarias y de propiedad
+        run: mvn test --batch-mode
+
+      - name: Empaquetar JAR
+        run: mvn package -DskipTests --batch-mode
+
+      - name: Login en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir y publicar imagen Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/guias-despacho:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/guias-despacho:${{ github.sha }}
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 2: Despliegue en EC2 vía SSH
+  # ─────────────────────────────────────────────────────────────
+  deploy-ec2:
+    needs: test-build-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Desplegar en EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          retry_count: 3
+          retry_wait: 30
+          timeout: 60s
+          command_timeout: 120s
+          script: |
+            # 1. Descargar nueva imagen
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/guias-despacho:latest
+
+            # 2. Detener y eliminar contenedor anterior (ignorar error si no existe)
+            docker stop guias-app || true
+            docker rm   guias-app || true
+
+            # 3. Levantar nuevo contenedor con todas las variables de entorno
+            docker run -d \
+              --name guias-app \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              -v /mnt/efs:/mnt/efs \
+              -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+              -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+              -e AWS_REGION=${{ secrets.AWS_REGION }} \
+              -e S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }} \
+              -e EFS_MOUNT_PATH=/mnt/efs/guias \
+              -e DB_URL=${{ secrets.DB_URL }} \
+              -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
+              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              ${{ secrets.DOCKERHUB_USERNAME }}/guias-despacho:latest
+
+            # 4. Esperar arranque y verificar health check
+            sleep 60
+            curl --fail http://localhost:8080/actuator/health
+            echo "Despliegue exitoso: $(docker inspect --format='{{.Id}}' guias-app | cut -c1-12)"
