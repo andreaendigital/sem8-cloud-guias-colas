@@ -4,7 +4,6 @@ import com.transportista.guias.service.GuiaServiceImpl;
 import com.transportista.guias.repository.GuiaRepository;
 import com.transportista.guias.service.PdfGeneratorService;
 import com.transportista.guias.service.S3StorageService;
-import com.transportista.guias.security.JwtUtil;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
 import net.jqwik.api.constraints.IntRange;
@@ -31,10 +30,9 @@ public class GuiaPaginacionInvalidaPropertyTest {
     private final GuiaRepository guiaRepository = Mockito.mock(GuiaRepository.class);
     private final PdfGeneratorService pdfGeneratorService = Mockito.mock(PdfGeneratorService.class);
     private final S3StorageService s3StorageService = Mockito.mock(S3StorageService.class);
-    private final JwtUtil jwtUtil = Mockito.mock(JwtUtil.class);
 
     private final GuiaServiceImpl service = new GuiaServiceImpl(
-            guiaRepository, pdfGeneratorService, s3StorageService, jwtUtil);
+            guiaRepository, pdfGeneratorService, s3StorageService);
 
     // -------------------------------------------------------------------------
     // size > 100 → IllegalArgumentException

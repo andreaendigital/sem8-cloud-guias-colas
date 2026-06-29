@@ -25,5 +25,4 @@ com\transportista\guias\service\GuiaServiceImpl.class
 com\transportista\guias\service\PdfGeneratorService.class
 com\transportista\guias\dto\PaginatedResponseDTO.class
 com\transportista\guias\exception\S3UploadException.class
-com\transportista\guias\config\JwtSecurityConfig.class
 com\transportista\guias\service\S3StorageService.class

@@ -4,7 +4,6 @@ C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 C
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\config\SwaggerConfig.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\security\JwtAuthFilter.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\dto\GuiaListItemDTO.java
-C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\config\JwtSecurityConfig.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\service\S3StorageServiceImpl.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\exception\GlobalExceptionHandler.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\repository\GuiaRepository.java
@@ -16,6 +15,7 @@ C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 C
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\exception\GuiaNotFoundException.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\dto\ActualizarGuiaRequestDTO.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\dto\PaginatedResponseDTO.java
+C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\config\SecurityConfig.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\service\PdfGeneratorServiceImpl.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\dto\CrearGuiaRequestDTO.java
 C:\Users\Andrea\Documents\DUOC ANALISTA PROGRAMADOR\015 CLOUD NATIVE\SEMANA 03 CLOUD NATIVE\Sem3\src\main\java\com\transportista\guias\model\EstadoGuia.java
