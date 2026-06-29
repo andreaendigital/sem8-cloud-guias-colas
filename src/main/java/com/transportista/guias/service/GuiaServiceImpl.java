@@ -12,7 +12,7 @@ import com.transportista.guias.exception.S3UploadException;
 import com.transportista.guias.model.EstadoGuia;
 import com.transportista.guias.model.Guia;
 import com.transportista.guias.repository.GuiaRepository;
-import com.transportista.guias.security.JwtUtil;
+// import com.transportista.guias.security.JwtUtil; // TODO: Reactivar para Experiencia 2
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -63,38 +63,18 @@ public class GuiaServiceImpl implements GuiaService {
     /** Servicio para operaciones con Amazon S3 (subida, eliminación, URLs pre-firmadas). */
     private final S3StorageService s3StorageService;
 
-    /** Utilidad para parsear y validar tokens JWT (extracción de claims). */
-    private final JwtUtil jwtUtil;
+    // TODO: Reactivar para Experiencia 2 — JwtUtil para verificación de claims
+    // private final JwtUtil jwtUtil;
 
-    /**
-     * Ruta del punto de montaje de EFS donde se almacenan los PDFs generados
-     * antes de su subida a S3. Configurada mediante la variable de entorno
-     * {@code EFS_MOUNT_PATH}.
-     */
     @Value("${efs.mount.path:/mnt/efs/guias}")
     private String efsMountPath;
 
-    // -------------------------------------------------------------------------
-    // Constructor
-    // -------------------------------------------------------------------------
-
-    /**
-     * Constructor con inyección de dependencias.
-     *
-     * @param guiaRepository      repositorio JPA de guías; no debe ser {@code null}.
-     * @param pdfGeneratorService servicio de generación asíncrona de PDFs; inyectado
-     *                            con {@code @Lazy} para evitar dependencias circulares.
-     * @param s3StorageService    servicio de operaciones con Amazon S3.
-     * @param jwtUtil             utilidad para parsear y validar tokens JWT.
-     */
     public GuiaServiceImpl(GuiaRepository guiaRepository,
                            @Lazy PdfGeneratorService pdfGeneratorService,
-                           S3StorageService s3StorageService,
-                           JwtUtil jwtUtil) {
+                           S3StorageService s3StorageService) {
         this.guiaRepository = guiaRepository;
         this.pdfGeneratorService = pdfGeneratorService;
         this.s3StorageService = s3StorageService;
-        this.jwtUtil = jwtUtil;
     }
 
     // -------------------------------------------------------------------------

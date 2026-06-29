@@ -31,7 +31,8 @@ import java.util.List;
  * }
  * }</pre>
  */
-@Component
+// TODO: Reactivar @Component para Experiencia 2 (requiere jwt.secret en application.properties)
+// @Component
 public class JwtUtil {
 
     private static final Logger log = LoggerFactory.getLogger(JwtUtil.class);
