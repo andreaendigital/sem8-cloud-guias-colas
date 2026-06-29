@@ -13,7 +13,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -136,27 +138,23 @@ public class GlobalExceptionHandler {
     }
 
     // -------------------------------------------------------------------------
-    // HTTP 403 — AccessDeniedException (permisos insuficientes)
+    // HTTP 403 — AccessDeniedException (@PreAuthorize / permisos insuficientes)
     // -------------------------------------------------------------------------
 
     /**
-     * Maneja denegaciones de acceso cuando el token JWT no tiene los permisos
-     * requeridos (rol ADMIN para eliminar, o transportistaId no autorizado para
-     * descargar).
+     * Captura denegaciones de acceso lanzadas por {@code @PreAuthorize} cuando
+     * el claim {@code extension_consultaRole} no tiene el rol requerido.
+     * Devuelve exactamente {@code {"error": "no tiene permiso"}} con HTTP 403.
      *
-     * @param ex excepción lanzada con el mensaje descriptivo del acceso denegado
-     * @return {@link ResponseEntity} con HTTP 403 y el mensaje de la excepción
+     * @param ex excepción de acceso denegado
+     * @return HTTP 403 con mensaje "no tiene permiso"
      */
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponseDTO> handleAccessDenied(
+    public ResponseEntity<Map<String, String>> handleAccessDeniedException(
             AccessDeniedException ex) {
-
-        ErrorResponseDTO body = new ErrorResponseDTO(
-                HttpStatus.FORBIDDEN.value(),
-                ex.getMessage(),
-                Instant.now()
-        );
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", "no tiene permiso");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
     }
 
     // -------------------------------------------------------------------------

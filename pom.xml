@@ -41,6 +41,12 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Spring Security OAuth2 Resource Server (Azure AD B2C) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+
         <!-- Spring Boot starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
