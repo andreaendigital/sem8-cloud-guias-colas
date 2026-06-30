@@ -54,7 +54,7 @@ public class GuiaController {
      * Requiere claim {@code extension_consultaRole = 'admin'}.
      */
     @PostMapping
-    @PreAuthorize("hasAuthority('SCOPE_api.access') and authentication.principal.claims['extension_consultaRole'].equals('admin')")
+    @PreAuthorize("authentication.principal.claims['extension_consultaRole'].equals('admin')")
     public ResponseEntity<GuiaResponseDTO> crearGuia(@Valid @RequestBody CrearGuiaRequestDTO dto) {
         GuiaResponseDTO response = guiaService.crearGuia(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -69,7 +69,7 @@ public class GuiaController {
      * Requiere claim {@code extension_consultaRole = 'admin'}.
      */
     @PostMapping("/{guiaId}/upload")
-    @PreAuthorize("hasAuthority('SCOPE_api.access') and authentication.principal.claims['extension_consultaRole'].equals('admin')")
+    @PreAuthorize("authentication.principal.claims['extension_consultaRole'].equals('admin')")
     public ResponseEntity<GuiaResponseDTO> uploadGuia(@PathVariable UUID guiaId) {
         GuiaResponseDTO response = guiaService.uploadGuia(guiaId);
         return ResponseEntity.ok(response);
@@ -84,9 +84,8 @@ public class GuiaController {
      * Permitido para {@code admin} y {@code transportista}.
      */
     @GetMapping("/{guiaId}/download")
-    @PreAuthorize("hasAuthority('SCOPE_api.access') and " +
-                  "(authentication.principal.claims['extension_consultaRole'].equals('admin') or " +
-                  "authentication.principal.claims['extension_consultaRole'].equals('transportista'))")
+    @PreAuthorize("authentication.principal.claims['extension_consultaRole'].equals('admin') or " +
+                  "authentication.principal.claims['extension_consultaRole'].equals('transportista')")
     public void downloadGuia(@PathVariable UUID guiaId,
                               HttpServletRequest request,
                               HttpServletResponse response) {
@@ -106,7 +105,7 @@ public class GuiaController {
      * Requiere claim {@code extension_consultaRole = 'admin'}.
      */
     @PutMapping("/{guiaId}")
-    @PreAuthorize("hasAuthority('SCOPE_api.access') and authentication.principal.claims['extension_consultaRole'].equals('admin')")
+    @PreAuthorize("authentication.principal.claims['extension_consultaRole'].equals('admin')")
     public ResponseEntity<GuiaResponseDTO> actualizarGuia(
             @PathVariable UUID guiaId,
             @RequestBody ActualizarGuiaRequestDTO dto) {
@@ -123,7 +122,7 @@ public class GuiaController {
      * Requiere claim {@code extension_consultaRole = 'admin'}.
      */
     @DeleteMapping("/{guiaId}")
-    @PreAuthorize("hasAuthority('SCOPE_api.access') and authentication.principal.claims['extension_consultaRole'].equals('admin')")
+    @PreAuthorize("authentication.principal.claims['extension_consultaRole'].equals('admin')")
     public ResponseEntity<String> eliminarGuia(@PathVariable UUID guiaId,
                                                HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -143,9 +142,8 @@ public class GuiaController {
      * Permitido para {@code admin} y {@code transportista}.
      */
     @GetMapping
-    @PreAuthorize("hasAuthority('SCOPE_api.access') and " +
-                  "(authentication.principal.claims['extension_consultaRole'].equals('admin') or " +
-                  "authentication.principal.claims['extension_consultaRole'].equals('transportista'))")
+    @PreAuthorize("authentication.principal.claims['extension_consultaRole'].equals('admin') or " +
+                  "authentication.principal.claims['extension_consultaRole'].equals('transportista')")
     public ResponseEntity<PaginatedResponseDTO<GuiaListItemDTO>> consultarGuias(
             @RequestParam String transportistaId,
             @RequestParam String fecha,
