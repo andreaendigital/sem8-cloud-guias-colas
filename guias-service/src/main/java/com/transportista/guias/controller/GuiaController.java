@@ -3,8 +3,10 @@ package com.transportista.guias.controller;
 import com.transportista.guias.dto.ActualizarGuiaRequestDTO;
 import com.transportista.guias.dto.CrearGuiaRequestDTO;
 import com.transportista.guias.dto.GuiaListItemDTO;
+import com.transportista.guias.dto.GuiaMensajeDTO;
 import com.transportista.guias.dto.GuiaResponseDTO;
 import com.transportista.guias.dto.PaginatedResponseDTO;
+import com.transportista.guias.messaging.GuiaMensajePublisher;
 import com.transportista.guias.service.GuiaService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -33,6 +36,10 @@ import java.util.UUID;
  *   <li>{@code admin} — acceso total a todos los endpoints.</li>
  *   <li>{@code transportista} — solo descarga y consulta.</li>
  * </ul>
+ *
+ * <p>Cada operación de escritura (crear, actualizar, eliminar) publica un mensaje
+ * en RabbitMQ vía {@link GuiaMensajePublisher} para que el microservicio Consumer
+ * persista el evento de forma asíncrona en su propia base de datos.</p>
  */
 @RestController
 @RequestMapping("/api/v1/guias")
@@ -40,9 +47,11 @@ import java.util.UUID;
 public class GuiaController {
 
     private final GuiaService guiaService;
+    private final GuiaMensajePublisher mensajePublisher;
 
-    public GuiaController(GuiaService guiaService) {
+    public GuiaController(GuiaService guiaService, GuiaMensajePublisher mensajePublisher) {
         this.guiaService = guiaService;
+        this.mensajePublisher = mensajePublisher;
     }
 
     // -------------------------------------------------------------------------
@@ -50,13 +59,28 @@ public class GuiaController {
     // -------------------------------------------------------------------------
 
     /**
-     * Crea una nueva Guía de Despacho.
+     * Crea una nueva Guía de Despacho y publica el evento en RabbitMQ.
      * Requiere claim {@code extension_consultaRole = 'admin'}.
      */
     @PostMapping
     @PreAuthorize("authentication.principal.claims['extension_consultaRole'].equals('admin')")
     public ResponseEntity<GuiaResponseDTO> crearGuia(@Valid @RequestBody CrearGuiaRequestDTO dto) {
         GuiaResponseDTO response = guiaService.crearGuia(dto);
+
+        // Publicar evento CREAR en RabbitMQ
+        mensajePublisher.publicar(new GuiaMensajeDTO(
+            response.getGuiaId(),
+            response.getTransportistaId(),
+            response.getFechaEnvio(),
+            response.getDestinatario(),
+            response.getDireccionDestino(),
+            response.getPesoKg(),
+            response.getDescripcionCarga(),
+            response.getObservaciones(),
+            GuiaMensajeDTO.Operacion.CREAR,
+            Instant.now()
+        ));
+
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -101,7 +125,7 @@ public class GuiaController {
     // -------------------------------------------------------------------------
 
     /**
-     * Actualiza los campos permitidos de la guía.
+     * Actualiza los campos permitidos de la guía y publica el evento en RabbitMQ.
      * Requiere claim {@code extension_consultaRole = 'admin'}.
      */
     @PutMapping("/{guiaId}")
@@ -110,6 +134,21 @@ public class GuiaController {
             @PathVariable UUID guiaId,
             @RequestBody ActualizarGuiaRequestDTO dto) {
         GuiaResponseDTO response = guiaService.actualizarGuia(guiaId, dto);
+
+        // Publicar evento ACTUALIZAR en RabbitMQ
+        mensajePublisher.publicar(new GuiaMensajeDTO(
+            response.getGuiaId(),
+            response.getTransportistaId(),
+            response.getFechaEnvio(),
+            response.getDestinatario(),
+            response.getDireccionDestino(),
+            response.getPesoKg(),
+            response.getDescripcionCarga(),
+            response.getObservaciones(),
+            GuiaMensajeDTO.Operacion.ACTUALIZAR,
+            Instant.now()
+        ));
+
         return ResponseEntity.ok(response);
     }
 
@@ -118,7 +157,7 @@ public class GuiaController {
     // -------------------------------------------------------------------------
 
     /**
-     * Elimina lógicamente la guía (soft delete).
+     * Elimina lógicamente la guía y publica el evento en RabbitMQ.
      * Requiere claim {@code extension_consultaRole = 'admin'}.
      */
     @DeleteMapping("/{guiaId}")
@@ -130,6 +169,15 @@ public class GuiaController {
                 ? authHeader.substring(7)
                 : "";
         guiaService.eliminarGuia(guiaId, token);
+
+        // Publicar evento ELIMINAR en RabbitMQ (solo con guiaId, sin datos adicionales)
+        mensajePublisher.publicar(new GuiaMensajeDTO(
+            guiaId,
+            null, null, null, null, null, null, null,
+            GuiaMensajeDTO.Operacion.ELIMINAR,
+            Instant.now()
+        ));
+
         return ResponseEntity.ok("Guía eliminada correctamente");
     }
 

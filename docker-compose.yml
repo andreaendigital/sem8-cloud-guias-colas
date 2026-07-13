@@ -1,0 +1,135 @@
+﻿version: '3.9'
+
+# =============================================================
+# MONOREPO sem8
+# Servicios: guias-service | producer | consumer | rabbitmq | localstack
+# =============================================================
+
+services:
+
+  # -----------------------------------------------------------
+  # RabbitMQ - Message Broker
+  # AMQP: 5672  |  Consola admin: http://localhost:15672
+  # usuario: guest / guest
+  # -----------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sem8-net
+
+  # -----------------------------------------------------------
+  # LocalStack - simula Amazon S3 localmente
+  # -----------------------------------------------------------
+  localstack:
+    image: localstack/localstack:3.0
+    container_name: localstack
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: s3
+      DEFAULT_REGION: us-east-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sem8-net
+
+  # -----------------------------------------------------------
+  # guias-service (puerto 8080)
+  # -----------------------------------------------------------
+  guias-service:
+    build:
+      context: ./guias-service
+      dockerfile: Dockerfile
+    container_name: guias-service
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1
+      DB_USERNAME: sa
+      DB_PASSWORD: ""
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT_OVERRIDE: http://localstack:4566
+      S3_BUCKET_NAME: guias-local
+      EFS_MOUNT_PATH: /tmp/efs-local
+      PDF_ASYNC_POOL_SIZE: 4
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    volumes:
+      - /tmp/efs-local:/tmp/efs-local
+    networks:
+      - sem8-net
+
+  # -----------------------------------------------------------
+  # producer (puerto 8081)
+  # -----------------------------------------------------------
+  producer:
+    build:
+      context: ./producer
+      dockerfile: Dockerfile
+    container_name: producer
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - sem8-net
+
+  # -----------------------------------------------------------
+  # consumer (puerto 8082)
+  # -----------------------------------------------------------
+  consumer:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
+    container_name: consumer
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      DB_URL: jdbc:h2:mem:consumerdb;DB_CLOSE_DELAY=-1
+      DB_USERNAME: sa
+      DB_PASSWORD: ""
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - sem8-net
+
+networks:
+  sem8-net:
+    driver: bridge
