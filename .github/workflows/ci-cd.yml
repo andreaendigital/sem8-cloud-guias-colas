@@ -197,14 +197,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copiar docker-compose.yml al EC2
+      - name: Copiar docker-compose.prod.yml al EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          source: "docker-compose.yml"
+          source: "docker-compose.prod.yml"
           target: "/home/ec2-user/sem8"
 
       - name: Desplegar stack completo en EC2
@@ -236,12 +236,14 @@ jobs:
             export RABBITMQ_PORT="5672"
             export RABBITMQ_USERNAME="${{ secrets.RABBITMQ_USERNAME }}"
             export RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}"
+            export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
             export AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}"
             export AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
             export AZURE_CLIENT_SECRET="${{ secrets.AZURE_CLIENT_SECRET }}"
 
             echo "=== Escribiendo .env para docker-compose ==="
             cat > .env << EOF
+            DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
             DB_URL=${DB_URL}
             DB_USERNAME=${DB_USERNAME}
             DB_PASSWORD=${DB_PASSWORD}
@@ -281,7 +283,7 @@ jobs:
             fi
 
             echo "=== Levantando stack con docker compose ==="
-            docker compose up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             echo "=== Esperando que los servicios arranquen (60s) ==="
             sleep 60
