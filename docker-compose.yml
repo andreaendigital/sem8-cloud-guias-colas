@@ -9,6 +9,12 @@
 #   /api/v1/guias/**    → guias-service:8090
 #   /api/v1/producer/** → producer:8081
 #   /api/v1/consumer/** → consumer:8082
+#
+# Variables de entorno requeridas (desde .env o GitHub Secrets):
+#   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+#   DB_URL, DB_USERNAME, DB_PASSWORD  (RDS PostgreSQL en prod)
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET_NAME
+#   RABBITMQ_HOST, RABBITMQ_USERNAME, RABBITMQ_PASSWORD
 # =============================================================
 
 services:
@@ -16,7 +22,6 @@ services:
   # -----------------------------------------------------------
   # RabbitMQ - Message Broker
   # AMQP: 5672  |  Consola admin: http://localhost:15672
-  # usuario: guest / guest
   # -----------------------------------------------------------
   rabbitmq:
     image: rabbitmq:3-management
@@ -36,7 +41,8 @@ services:
       - sem8-net
 
   # -----------------------------------------------------------
-  # LocalStack — simula Amazon S3 localmente
+  # LocalStack — simula Amazon S3 localmente (solo dev/local)
+  # En producción se usa S3 real con las credenciales AWS
   # -----------------------------------------------------------
   localstack:
     image: localstack/localstack:3.0
@@ -55,7 +61,8 @@ services:
       - sem8-net
 
   # -----------------------------------------------------------
-  # guias-service (puerto INTERNO 8090 — acceso público via gateway:8080)
+  # guias-service (puerto INTERNO 8090)
+  # Acceso público único via gateway:8080/api/v1/guias/**
   # -----------------------------------------------------------
   guias-service:
     build:
@@ -63,26 +70,47 @@ services:
       dockerfile: Dockerfile
     container_name: guias-service
     ports:
-      - "8090:8090"          # Expuesto localmente para debug; en prod solo el gateway lo llama
+      - "8090:8090"
     environment:
       SERVER_PORT: 8090
-      DB_URL: jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1
-      DB_USERNAME: sa
-      DB_PASSWORD: ""
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_REGION: us-east-1
-      AWS_ENDPOINT_OVERRIDE: http://localstack:4566
-      S3_BUCKET_NAME: guias-local
+
+      # ── Base de datos PostgreSQL RDS ──────────────────────
+      # Valores por defecto H2 para desarrollo local.
+      # En producción sobreescribir con los secrets de RDS.
+      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-sa}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-}
+      # Driver y dialecto: PostgreSQL en prod, H2 en local
+      SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.h2.Driver}
+      JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.H2Dialect}
+      # Alias legacy que usa el application.properties actual
+      DB_URL: ${DB_URL:-jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1}
+      DB_USERNAME: ${DB_USERNAME:-sa}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+
+      # ── AWS S3 ────────────────────────────────────────────
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ENDPOINT_OVERRIDE: ${AWS_ENDPOINT_OVERRIDE:-http://localstack:4566}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-guias-local}
+
+      # ── EFS / PDF ─────────────────────────────────────────
       EFS_MOUNT_PATH: /tmp/efs-local
       PDF_ASYNC_POOL_SIZE: 4
-      RABBITMQ_HOST: rabbitmq
+
+      # ── RabbitMQ ──────────────────────────────────────────
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+
+      # ── Azure AD B2C ──────────────────────────────────────
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+
+      # ── JVM ───────────────────────────────────────────────
       JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -Xmx160m"
     deploy:
       resources:
@@ -99,7 +127,8 @@ services:
       - sem8-net
 
   # -----------------------------------------------------------
-  # producer (puerto INTERNO 8081 — acceso público via gateway:8080)
+  # producer (puerto INTERNO 8081)
+  # Acceso público único via gateway:8080/api/v1/producer/**
   # -----------------------------------------------------------
   producer:
     build:
@@ -110,13 +139,19 @@ services:
       - "8081:8081"
     environment:
       SERVER_PORT: 8081
-      RABBITMQ_HOST: rabbitmq
+
+      # ── RabbitMQ ──────────────────────────────────────────
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+
+      # ── Azure AD B2C ──────────────────────────────────────
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+
+      # ── JVM ───────────────────────────────────────────────
       JAVA_OPTS: "-Xmx120m"
     deploy:
       resources:
@@ -129,7 +164,8 @@ services:
       - sem8-net
 
   # -----------------------------------------------------------
-  # consumer (puerto INTERNO 8082 — acceso público via gateway:8080)
+  # consumer (puerto INTERNO 8082)
+  # Acceso público único via gateway:8080/api/v1/consumer/**
   # -----------------------------------------------------------
   consumer:
     build:
@@ -140,16 +176,33 @@ services:
       - "8082:8082"
     environment:
       SERVER_PORT: 8082
-      RABBITMQ_HOST: rabbitmq
+
+      # ── Base de datos PostgreSQL RDS ──────────────────────
+      # Valores por defecto H2 para desarrollo local.
+      # En producción sobreescribir con los secrets de RDS.
+      SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:h2:mem:consumerdb;DB_CLOSE_DELAY=-1}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-sa}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-}
+      # Driver y dialecto: PostgreSQL en prod, H2 en local
+      SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.h2.Driver}
+      JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.H2Dialect}
+      # Alias legacy que usa el application.properties actual
+      DB_URL: ${DB_URL:-jdbc:h2:mem:consumerdb;DB_CLOSE_DELAY=-1}
+      DB_USERNAME: ${DB_USERNAME:-sa}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+
+      # ── RabbitMQ ──────────────────────────────────────────
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: guest
-      RABBITMQ_PASSWORD: guest
-      DB_URL: jdbc:h2:mem:consumerdb;DB_CLOSE_DELAY=-1
-      DB_USERNAME: sa
-      DB_PASSWORD: ""
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+
+      # ── Azure AD B2C ──────────────────────────────────────
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+
+      # ── JVM ───────────────────────────────────────────────
       JAVA_OPTS: "-Xmx120m"
     deploy:
       resources:
@@ -163,7 +216,8 @@ services:
 
   # -----------------------------------------------------------
   # API Gateway — punto de entrada único (puerto 8080)
-  # Valida JWT Azure AD B2C y enruta a los microservicios internos
+  # Primera capa: valida JWT Azure AD B2C
+  # Segunda capa: cada microservicio valida de nuevo
   # -----------------------------------------------------------
   gateway:
     build:
@@ -174,12 +228,18 @@ services:
       - "8080:8080"
     environment:
       SERVER_PORT: 8080
+
+      # ── URLs internas de los microservicios ───────────────
       GUIAS_SERVICE_URL: http://guias-service:8090
       PRODUCER_URL: http://producer:8081
       CONSUMER_URL: http://consumer:8082
+
+      # ── Azure AD B2C ──────────────────────────────────────
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+
+      # ── JVM ───────────────────────────────────────────────
       JAVA_OPTS: "-Xmx120m"
     deploy:
       resources:

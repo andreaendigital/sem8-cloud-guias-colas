@@ -17,6 +17,10 @@ spring:
           issuer-uri: https://duocrosero.b2clogin.com/${AZURE_TENANT_ID}/v2.0/
           jwk-set-uri: https://duocrosero.b2clogin.com/duocrosero.onmicrosoft.com/discovery/v2.0/keys?p=b2c_1_signupsignin
 
+  # ──────────────────────────────────────────────────────────────
+  # Bloque cloud unificado — azure + gateway bajo la misma clave
+  # (YAML no permite la clave 'cloud' duplicada al mismo nivel)
+  # ──────────────────────────────────────────────────────────────
   cloud:
     azure:
       active-directory:
@@ -27,10 +31,6 @@ spring:
             client-id: ${AZURE_CLIENT_ID}
             client-secret: ${AZURE_CLIENT_SECRET}
 
-  # ──────────────────────────────────────────────────────────────
-  # Spring Cloud Gateway — Rutas de proxy
-  # ──────────────────────────────────────────────────────────────
-  cloud:
     gateway:
       # Propagar el header Authorization al microservicio destino
       default-filters:
@@ -38,10 +38,7 @@ spring:
 
       routes:
 
-        # ──────────────────────────────────────────
-        # Ruta 1: guias-service
-        # Todos los requests /api/v1/guias/** van al puerto 8090
-        # ──────────────────────────────────────────
+        # ── Ruta 1: guias-service ──────────────────────────
         - id: guias-service
           uri: ${GUIAS_SERVICE_URL:http://guias-service:8090}
           predicates:
@@ -52,10 +49,7 @@ spring:
                 name: guias-cb
                 fallbackUri: forward:/fallback/guias
 
-        # ──────────────────────────────────────────
-        # Ruta 2: producer
-        # Todos los requests /api/v1/producer/** van al puerto 8081
-        # ──────────────────────────────────────────
+        # ── Ruta 2: producer ───────────────────────────────
         - id: producer
           uri: ${PRODUCER_URL:http://producer:8081}
           predicates:
@@ -66,10 +60,7 @@ spring:
                 name: producer-cb
                 fallbackUri: forward:/fallback/producer
 
-        # ──────────────────────────────────────────
-        # Ruta 3: consumer
-        # Todos los requests /api/v1/consumer/** van al puerto 8082
-        # ──────────────────────────────────────────
+        # ── Ruta 3: consumer ───────────────────────────────
         - id: consumer
           uri: ${CONSUMER_URL:http://consumer:8082}
           predicates:
@@ -99,5 +90,5 @@ management:
 # ──────────────────────────────────────────────────────────────
 logging:
   level:
-    org.springframework.cloud.gateway: INFO
-    org.springframework.security: INFO
+    "[org.springframework.cloud.gateway]": INFO
+    "[org.springframework.security]": INFO

@@ -10,22 +10,26 @@ services:
       - "8080:8080"
     environment:
       # Base de datos H2 en memoria (desarrollo local)
-      DB_URL: jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1
-      DB_USERNAME: sa
-      DB_PASSWORD: ""
+      DB_URL: ${DB_URL:-jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1}
+      DB_USERNAME: ${DB_USERNAME:-sa}
+      DB_PASSWORD: ${DB_PASSWORD:-}
       # JWT (clave de desarrollo)
       # TODO: Reactivar para Experiencia 2
       # JWT_SECRET: dev-secret-key-min-32-chars-long!!
       # AWS / LocalStack
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
       #AWS_ENDPOINT_OVERRIDE: http://localstack:4566
-      S3_BUCKET_NAME: guias-local
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-guias-local}
       # Almacenamiento temporal de PDFs (EFS simulado localmente)
       EFS_MOUNT_PATH: /tmp/efs-local
       # Thread pool PDF
       PDF_ASYNC_POOL_SIZE: 4
+      # Azure AD B2C
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
     #depends_on:
      # localstack:
       #  condition: service_healthy
