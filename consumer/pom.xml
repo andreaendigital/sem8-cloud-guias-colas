@@ -49,6 +49,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- PostgreSQL — para producción RDS -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- MySQL — para producción/RDS -->
         <dependency>
             <groupId>com.mysql</groupId>

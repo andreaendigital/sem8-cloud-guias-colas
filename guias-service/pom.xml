@@ -138,6 +138,13 @@
             <version>${springdoc.version}</version>
         </dependency>
 
+        <!-- PostgreSQL — para producción RDS -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
         <!-- MySQL connector (runtime) -->
         <dependency>
             <groupId>com.mysql</groupId>
