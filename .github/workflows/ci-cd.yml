@@ -173,8 +173,8 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          timeout: 60s
-          command_timeout: 600s
+          timeout: 120s
+          command_timeout: 900s
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,IMAGE_TAG,DB_URL,DB_USERNAME,DB_PASSWORD,DB_DRIVER,DB_DIALECT,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION,S3_BUCKET_NAME,RABBITMQ_USERNAME,RABBITMQ_PASSWORD,AZURE_TENANT_ID,AZURE_CLIENT_ID,AZURE_CLIENT_SECRET
           script: |
             set -e
