@@ -201,17 +201,17 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
+          username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: "docker-compose.yml"
-          target: "/home/${{ secrets.EC2_USER }}/sem8"
+          target: "/home/ec2-user/sem8"
 
       - name: Desplegar stack completo en EC2
-        uses: appleboy/ssh-action@v1
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
+          username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           retry_count: 3
@@ -220,34 +220,48 @@ jobs:
           command_timeout: 300s
           script: |
             set -e
-            cd /home/${{ secrets.EC2_USER }}/sem8
+            mkdir -p /home/ec2-user/sem8
+            cd /home/ec2-user/sem8
 
-            echo "=== Escribiendo .env con variables de producción ==="
-            cat > .env << 'ENVEOF'
-            DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            DB_URL=${{ secrets.DB_URL }}
-            DB_USERNAME=${{ secrets.DB_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            DB_DRIVER=org.postgresql.Driver
-            DB_DIALECT=org.hibernate.dialect.PostgreSQLDialect
-            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
-            AWS_REGION=${{ secrets.AWS_REGION }}
-            S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-            RABBITMQ_HOST=${{ secrets.RABBITMQ_HOST }}
-            RABBITMQ_PORT=5672
-            RABBITMQ_USERNAME=${{ secrets.RABBITMQ_USERNAME }}
-            RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
-            AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
-            AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
-            AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}
-            ENVEOF
-
-            echo "=== Exportando variables Azure al entorno del shell ==="
+            echo "=== Exportando todas las variables al entorno del shell ==="
+            export DB_URL="${{ secrets.DB_URL }}"
+            export DB_USERNAME="${{ secrets.DB_USERNAME }}"
+            export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+            export DB_DRIVER="org.postgresql.Driver"
+            export DB_DIALECT="org.hibernate.dialect.PostgreSQLDialect"
+            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+            export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
+            export AWS_REGION="${{ secrets.AWS_REGION }}"
+            export S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
+            export RABBITMQ_HOST="${{ secrets.RABBITMQ_HOST }}"
+            export RABBITMQ_PORT="5672"
+            export RABBITMQ_USERNAME="${{ secrets.RABBITMQ_USERNAME }}"
+            export RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}"
             export AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}"
             export AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
             export AZURE_CLIENT_SECRET="${{ secrets.AZURE_CLIENT_SECRET }}"
+
+            echo "=== Escribiendo .env para docker-compose ==="
+            cat > .env << EOF
+            DB_URL=${DB_URL}
+            DB_USERNAME=${DB_USERNAME}
+            DB_PASSWORD=${DB_PASSWORD}
+            DB_DRIVER=${DB_DRIVER}
+            DB_DIALECT=${DB_DIALECT}
+            AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+            AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+            AWS_REGION=${AWS_REGION}
+            S3_BUCKET_NAME=${S3_BUCKET_NAME}
+            RABBITMQ_HOST=${RABBITMQ_HOST}
+            RABBITMQ_PORT=${RABBITMQ_PORT}
+            RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+            RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+            AZURE_TENANT_ID=${AZURE_TENANT_ID}
+            AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+            AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+            EOF
 
             echo "=== Descargando imágenes actualizadas ==="
             docker pull ${{ env.IMAGE_GUIAS }}:latest
@@ -255,26 +269,13 @@ jobs:
             docker pull ${{ env.IMAGE_CONSUMER }}:latest
             docker pull ${{ env.IMAGE_GATEWAY }}:latest
 
-            echo "=== Actualizando variables en docker-compose para EC2 ==="
-            # Reemplazar 'build: context:' por 'image:' para usar imágenes de Docker Hub
-            # y ajustar URLs internas para que usen la IP de EC2
-            sed -i "s|build:|#build:|g" docker-compose.yml
-            sed -i "s|#  context:|#  context:|g" docker-compose.yml
-            sed -i "s|#  dockerfile:|#  dockerfile:|g" docker-compose.yml
-
-            # Inyectar image: en cada servicio
-            sed -i "/container_name: guias-service/i\\    image: ${{ env.IMAGE_GUIAS }}:latest" docker-compose.yml
-            sed -i "/container_name: producer/i\\    image: ${{ env.IMAGE_PRODUCER }}:latest" docker-compose.yml
-            sed -i "/container_name: consumer/i\\    image: ${{ env.IMAGE_CONSUMER }}:latest" docker-compose.yml
-            sed -i "/container_name: gateway/i\\    image: ${{ env.IMAGE_GATEWAY }}:latest" docker-compose.yml
-
             echo "=== Levantando stack con docker-compose ==="
             docker-compose --env-file .env up -d --remove-orphans
 
             echo "=== Esperando que los servicios arranquen (60s) ==="
             sleep 60
 
-            echo "=== Verificando health checks ==="
+            echo "=== Verificando health check del gateway ==="
             if ! curl --fail --silent http://localhost:8080/actuator/health; then
               echo "ERROR: Gateway no responde. Logs:"
               docker logs gateway --tail 50
@@ -283,6 +284,6 @@ jobs:
 
             echo ""
             echo "✓ Despliegue exitoso"
-            echo "  Gateway:       http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
-            echo "  RabbitMQ UI:   http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):15672"
+            echo "  Gateway:     http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
+            echo "  RabbitMQ UI: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):15672"
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
