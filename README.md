@@ -1,5 +1,9 @@
 # sem8 — Cloud Native: Guías de Despacho con Mensajería Asíncrona
 
+Link al video: https://youtu.be/pRO9_dyJetc
+Link al informe: 
+Adicionalmente se presenta documentación en este readme
+
 ## Estado actual de avance
 14/07/26  2:55 am
 
