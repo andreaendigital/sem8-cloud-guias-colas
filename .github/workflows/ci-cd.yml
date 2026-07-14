@@ -205,7 +205,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           timeout: 60s
-          command_timeout: 300s
+          command_timeout: 600s
           script: |
             set -e
             mkdir -p /home/ec2-user/sem8
@@ -393,8 +393,8 @@ jobs:
             echo "=== Levantando stack con docker compose ==="
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-            echo "=== Esperando que los servicios arranquen (60s) ==="
-            sleep 60
+            echo "=== Esperando que los servicios arranquen (120s) ==="
+            sleep 120
 
             echo "=== Verificando health check del gateway ==="
             if ! curl --fail --silent http://localhost:8080/actuator/health; then
