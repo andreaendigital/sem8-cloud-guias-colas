@@ -3,8 +3,14 @@ name: CI/CD Pipeline — Monorepo sem8
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '**.md'
 
 jobs:
   # ─────────────────────────────────────────────────────────────

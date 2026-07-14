@@ -1,6 +1,7 @@
 # sem8 — Cloud Native: Guías de Despacho con Mensajería Asíncrona
 
 ## Estado actual de avance
+14/07/26  2:55 am
 
 Se completó el desarrollo e implementación de los tres microservicios y la infraestructura de mensajería. Durante las pruebas de integración en EC2 se logró acceder correctamente a la interfaz de administración de RabbitMQ (`http://IP:15672`), se verificaron las colas, el exchange y los bindings declarados automáticamente por Spring AMQP.
 
