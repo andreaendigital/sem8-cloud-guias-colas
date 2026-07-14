@@ -268,7 +268,7 @@ jobs:
             docker pull ${{ env.IMAGE_GATEWAY }}:latest
 
             echo "=== Levantando stack con docker compose ==="
-            docker compose --env-file .env up -d --remove-orphans
+            docker compose up -d --remove-orphans
 
             echo "=== Esperando que los servicios arranquen (60s) ==="
             sleep 60
