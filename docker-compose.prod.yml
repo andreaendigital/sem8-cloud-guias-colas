@@ -3,25 +3,20 @@ version: '3.9'
 # =============================================================
 # PRODUCCIÓN — docker-compose.prod.yml
 # Usa imágenes pre-buildeadas desde Docker Hub.
-# NO requiere código fuente ni carpetas de microservicios.
-# Se despliega en EC2 via GitHub Actions CI/CD.
+# Este archivo es generado/copiado al EC2 por el CI/CD.
 #
-# Variables requeridas en .env del EC2 (generadas por CI/CD):
+# Variables requeridas en .env del EC2:
 #   DOCKERHUB_USERNAME
-#   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+#   RABBITMQ_USERNAME, RABBITMQ_PASSWORD
 #   DB_URL, DB_USERNAME, DB_PASSWORD, DB_DRIVER, DB_DIALECT
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, S3_BUCKET_NAME
-#   RABBITMQ_HOST, RABBITMQ_USERNAME, RABBITMQ_PASSWORD
+#   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
 # =============================================================
 
 services:
 
-  # -----------------------------------------------------------
-  # RabbitMQ - Message Broker
-  # AMQP: 5672  |  Consola admin: http://EC2-IP:15672
-  # -----------------------------------------------------------
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management
     container_name: rabbitmq
     ports:
       - "5672:5672"
@@ -37,18 +32,13 @@ services:
     networks:
       - sem8-net
 
-  # -----------------------------------------------------------
-  # guias-service — imagen desde Docker Hub
-  # -----------------------------------------------------------
   guias-service:
     image: ${DOCKERHUB_USERNAME}/guias-service:latest
     container_name: guias-service
     ports:
-      - "8090:8090"
+      - "8080:8080"
     environment:
-      SERVER_PORT: 8090
-
-      # ── Base de datos PostgreSQL RDS ──────────────────────
+      SERVER_PORT: 8080
       SPRING_DATASOURCE_URL: ${DB_URL}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
@@ -57,46 +47,27 @@ services:
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
-
-      # ── AWS S3 ────────────────────────────────────────────
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_REGION: ${AWS_REGION}
       AWS_ENDPOINT_OVERRIDE: ""
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-
-      # ── EFS / PDF ─────────────────────────────────────────
       EFS_MOUNT_PATH: /tmp/efs-local
       PDF_ASYNC_POOL_SIZE: 4
-
-      # ── RabbitMQ ──────────────────────────────────────────
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-
-      # ── Azure AD B2C ──────────────────────────────────────
       AZURE_TENANT_ID: ${AZURE_TENANT_ID}
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
-
-      # ── JVM ───────────────────────────────────────────────
       JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -Xmx160m"
-    deploy:
-      resources:
-        limits:
-          memory: 200M
     depends_on:
       rabbitmq:
         condition: service_healthy
-    volumes:
-      - efs-data:/tmp/efs-local
     networks:
       - sem8-net
 
-  # -----------------------------------------------------------
-  # producer — imagen desde Docker Hub
-  # -----------------------------------------------------------
   producer:
     image: ${DOCKERHUB_USERNAME}/producer:latest
     container_name: producer
@@ -112,19 +83,12 @@ services:
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
       JAVA_OPTS: "-Xmx120m"
-    deploy:
-      resources:
-        limits:
-          memory: 150M
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - sem8-net
 
-  # -----------------------------------------------------------
-  # consumer — imagen desde Docker Hub
-  # -----------------------------------------------------------
   consumer:
     image: ${DOCKERHUB_USERNAME}/consumer:latest
     container_name: consumer
@@ -148,48 +112,12 @@ services:
       AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
       AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
       JAVA_OPTS: "-Xmx120m"
-    deploy:
-      resources:
-        limits:
-          memory: 150M
     depends_on:
       rabbitmq:
         condition: service_healthy
     networks:
       - sem8-net
 
-  # -----------------------------------------------------------
-  # gateway — imagen desde Docker Hub
-  # Punto de entrada único: http://EC2-IP:8080
-  # -----------------------------------------------------------
-  gateway:
-    image: ${DOCKERHUB_USERNAME}/gateway:latest
-    container_name: gateway
-    ports:
-      - "8080:8080"
-    environment:
-      SERVER_PORT: 8080
-      GUIAS_SERVICE_URL: http://guias-service:8090
-      PRODUCER_URL: http://producer:8081
-      CONSUMER_URL: http://consumer:8082
-      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
-      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
-      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
-      JAVA_OPTS: "-Xmx120m"
-    deploy:
-      resources:
-        limits:
-          memory: 150M
-    depends_on:
-      - guias-service
-      - producer
-      - consumer
-    networks:
-      - sem8-net
-
 networks:
   sem8-net:
     driver: bridge
-
-volumes:
-  efs-data:

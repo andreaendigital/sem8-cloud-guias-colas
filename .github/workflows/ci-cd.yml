@@ -6,23 +6,16 @@ on:
   pull_request:
     branches: [main]
 
-# ─────────────────────────────────────────────────────────────────
-# Variables de entorno globales del pipeline
-# ─────────────────────────────────────────────────────────────────
-env:
-  REGISTRY: docker.io
-  IMAGE_GUIAS:    ${{ secrets.DOCKERHUB_USERNAME }}/guias-service
-  IMAGE_PRODUCER: ${{ secrets.DOCKERHUB_USERNAME }}/producer
-  IMAGE_CONSUMER: ${{ secrets.DOCKERHUB_USERNAME }}/consumer
-  IMAGE_GATEWAY:  ${{ secrets.DOCKERHUB_USERNAME }}/gateway
-
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # Job 1: Build y tests de guias-service
+  # Job 1: Build & Push guias-service
   # ─────────────────────────────────────────────────────────────
   build-guias:
     name: Build guias-service
     runs-on: ubuntu-latest
+    env:
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/guias-service
+      IMAGE_TAG: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,113 +23,14 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
           cache: maven
 
-      - name: Tests y empaquetado guias-service
-        run: mvn test package --batch-mode
+      - name: Empaquetar guias-service
+        run: mvn -B clean package -DskipTests
         working-directory: guias-service
 
-      - name: Upload JAR guias-service
-        uses: actions/upload-artifact@v4
-        with:
-          name: guias-jar
-          path: guias-service/target/*.jar
-          retention-days: 1
-
-  # ─────────────────────────────────────────────────────────────
-  # Job 2: Build y tests de producer
-  # ─────────────────────────────────────────────────────────────
-  build-producer:
-    name: Build producer
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configurar Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Tests y empaquetado producer
-        run: mvn test package --batch-mode
-        working-directory: producer
-
-      - name: Upload JAR producer
-        uses: actions/upload-artifact@v4
-        with:
-          name: producer-jar
-          path: producer/target/*.jar
-          retention-days: 1
-
-  # ─────────────────────────────────────────────────────────────
-  # Job 3: Build y tests de consumer
-  # ─────────────────────────────────────────────────────────────
-  build-consumer:
-    name: Build consumer
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configurar Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Tests y empaquetado consumer
-        run: mvn test package --batch-mode
-        working-directory: consumer
-
-      - name: Upload JAR consumer
-        uses: actions/upload-artifact@v4
-        with:
-          name: consumer-jar
-          path: consumer/target/*.jar
-          retention-days: 1
-
-  # ─────────────────────────────────────────────────────────────
-  # Job 4: Build y tests de gateway
-  # ─────────────────────────────────────────────────────────────
-  build-gateway:
-    name: Build gateway
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configurar Java 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Tests y empaquetado gateway
-        run: mvn test package --batch-mode
-        working-directory: gateway
-
-      - name: Upload JAR gateway
-        uses: actions/upload-artifact@v4
-        with:
-          name: gateway-jar
-          path: gateway/target/*.jar
-          retention-days: 1
-
-  # ─────────────────────────────────────────────────────────────
-  # Job 5: Build y Push de las 4 imágenes Docker a Docker Hub
-  # Solo en push a main (no en PRs)
-  # ─────────────────────────────────────────────────────────────
-  docker-push:
-    name: Build & Push Docker Images
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [build-guias, build-producer, build-consumer, build-gateway]
-
-    steps:
-      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
 
       - name: Login en Docker Hub
         uses: docker/login-action@v3
@@ -144,61 +38,130 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # ── guias-service ──
       - name: Build & Push guias-service
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./guias-service
-          push: true
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
-            ${{ env.IMAGE_GUIAS }}:latest
-            ${{ env.IMAGE_GUIAS }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
 
-      # ── producer ──
+  # ─────────────────────────────────────────────────────────────
+  # Job 2: Build & Push producer
+  # ─────────────────────────────────────────────────────────────
+  build-producer:
+    name: Build producer
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/producer
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: Empaquetar producer
+        run: mvn -B clean package -DskipTests
+        working-directory: producer
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build & Push producer
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./producer
-          push: true
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
-            ${{ env.IMAGE_PRODUCER }}:latest
-            ${{ env.IMAGE_PRODUCER }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
 
-      # ── consumer ──
+  # ─────────────────────────────────────────────────────────────
+  # Job 3: Build & Push consumer
+  # ─────────────────────────────────────────────────────────────
+  build-consumer:
+    name: Build consumer
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/consumer
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: Empaquetar consumer
+        run: mvn -B clean package -DskipTests
+        working-directory: consumer
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Build & Push consumer
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./consumer
-          push: true
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
-            ${{ env.IMAGE_CONSUMER }}:latest
-            ${{ env.IMAGE_CONSUMER }}:${{ github.sha }}
-
-      # ── gateway ──
-      - name: Build & Push gateway
-        uses: docker/build-push-action@v5
-        with:
-          context: ./gateway
-          push: true
-          tags: |
-            ${{ env.IMAGE_GATEWAY }}:latest
-            ${{ env.IMAGE_GATEWAY }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
 
   # ─────────────────────────────────────────────────────────────
-  # Job 6: Deploy en EC2 vía SSH
-  # Descarga las 4 imágenes nuevas y levanta el stack completo
+  # Job 4: Deploy en EC2
   # ─────────────────────────────────────────────────────────────
-  deploy-ec2:
+  deploy:
     name: Deploy en EC2
     runs-on: ubuntu-latest
-    needs: docker-push
+    needs: [build-guias, build-producer, build-consumer]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      IMAGE_TAG: ${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Desplegar stack completo en EC2
+      - name: Deploy microservicios en EC2
         uses: appleboy/ssh-action@master
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          IMAGE_TAG: ${{ github.sha }}
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_DRIVER: org.postgresql.Driver
+          DB_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+          RABBITMQ_USERNAME: ${{ secrets.RABBITMQ_USERNAME }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
@@ -206,34 +169,22 @@ jobs:
           port: 22
           timeout: 60s
           command_timeout: 600s
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,IMAGE_TAG,DB_URL,DB_USERNAME,DB_PASSWORD,DB_DRIVER,DB_DIALECT,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_SESSION_TOKEN,AWS_REGION,S3_BUCKET_NAME,RABBITMQ_USERNAME,RABBITMQ_PASSWORD,AZURE_TENANT_ID,AZURE_CLIENT_ID,AZURE_CLIENT_SECRET
           script: |
             set -e
             mkdir -p /home/ec2-user/sem8
             cd /home/ec2-user/sem8
 
-            echo "=== Exportando todas las variables al entorno del shell ==="
-            export DB_URL="${{ secrets.DB_URL }}"
-            export DB_USERNAME="${{ secrets.DB_USERNAME }}"
-            export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
-            export DB_DRIVER="org.postgresql.Driver"
-            export DB_DIALECT="org.hibernate.dialect.PostgreSQLDialect"
-            export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-            export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-            export AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}"
-            export AWS_REGION="${{ secrets.AWS_REGION }}"
-            export S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
-            export RABBITMQ_HOST="${{ secrets.RABBITMQ_HOST }}"
-            export RABBITMQ_PORT="5672"
-            export RABBITMQ_USERNAME="${{ secrets.RABBITMQ_USERNAME }}"
-            export RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}"
-            export DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME }}"
-            export AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}"
-            export AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
-            export AZURE_CLIENT_SECRET="${{ secrets.AZURE_CLIENT_SECRET }}"
+            # Autenticarse en Docker Hub desde el EC2
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
-            echo "=== Escribiendo .env para docker compose ==="
+            # Crear red compartida si no existe
+            docker network create sem8-net || true
+
+            # Escribir .env con todas las variables
             cat > .env << EOF
             DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
+            IMAGE_TAG=${IMAGE_TAG}
             DB_URL=${DB_URL}
             DB_USERNAME=${DB_USERNAME}
             DB_PASSWORD=${DB_PASSWORD}
@@ -244,8 +195,6 @@ jobs:
             AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
             AWS_REGION=${AWS_REGION}
             S3_BUCKET_NAME=${S3_BUCKET_NAME}
-            RABBITMQ_HOST=${RABBITMQ_HOST}
-            RABBITMQ_PORT=${RABBITMQ_PORT}
             RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
             RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
             AZURE_TENANT_ID=${AZURE_TENANT_ID}
@@ -253,12 +202,12 @@ jobs:
             AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
             EOF
 
-            echo "=== Escribiendo docker-compose.prod.yml en el servidor ==="
+            # Escribir docker-compose.prod.yml en el servidor
             cat > docker-compose.prod.yml << 'COMPOSEOF'
             version: '3.9'
             services:
               rabbitmq:
-                image: rabbitmq:3-management
+                image: rabbitmq:4-management
                 container_name: rabbitmq
                 ports:
                   - "5672:5672"
@@ -273,18 +222,19 @@ jobs:
                   retries: 10
                 networks:
                   - sem8-net
+
               guias-service:
                 image: ${DOCKERHUB_USERNAME}/guias-service:latest
                 container_name: guias-service
                 ports:
-                  - "8090:8090"
+                  - "8080:8080"
                 environment:
-                  SERVER_PORT: 8090
+                  SERVER_PORT: 8080
                   SPRING_DATASOURCE_URL: ${DB_URL}
                   SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
                   SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-                  SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.postgresql.Driver}
-                  JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.PostgreSQLDialect}
+                  SPRING_DATASOURCE_DRIVER: ${DB_DRIVER}
+                  JPA_DIALECT: ${DB_DIALECT}
                   DB_URL: ${DB_URL}
                   DB_USERNAME: ${DB_USERNAME}
                   DB_PASSWORD: ${DB_PASSWORD}
@@ -297,8 +247,8 @@ jobs:
                   PDF_ASYNC_POOL_SIZE: 4
                   RABBITMQ_HOST: rabbitmq
                   RABBITMQ_PORT: 5672
-                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
-                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
                   AZURE_TENANT_ID: ${AZURE_TENANT_ID}
                   AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
                   AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
@@ -308,6 +258,7 @@ jobs:
                     condition: service_healthy
                 networks:
                   - sem8-net
+
               producer:
                 image: ${DOCKERHUB_USERNAME}/producer:latest
                 container_name: producer
@@ -317,8 +268,8 @@ jobs:
                   SERVER_PORT: 8081
                   RABBITMQ_HOST: rabbitmq
                   RABBITMQ_PORT: 5672
-                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
-                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
                   AZURE_TENANT_ID: ${AZURE_TENANT_ID}
                   AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
                   AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
@@ -328,6 +279,7 @@ jobs:
                     condition: service_healthy
                 networks:
                   - sem8-net
+
               consumer:
                 image: ${DOCKERHUB_USERNAME}/consumer:latest
                 container_name: consumer
@@ -338,15 +290,15 @@ jobs:
                   SPRING_DATASOURCE_URL: ${DB_URL}
                   SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
                   SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-                  SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.postgresql.Driver}
-                  JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.PostgreSQLDialect}
+                  SPRING_DATASOURCE_DRIVER: ${DB_DRIVER}
+                  JPA_DIALECT: ${DB_DIALECT}
                   DB_URL: ${DB_URL}
                   DB_USERNAME: ${DB_USERNAME}
                   DB_PASSWORD: ${DB_PASSWORD}
                   RABBITMQ_HOST: rabbitmq
                   RABBITMQ_PORT: 5672
-                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
-                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
                   AZURE_TENANT_ID: ${AZURE_TENANT_ID}
                   AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
                   AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
@@ -356,55 +308,32 @@ jobs:
                     condition: service_healthy
                 networks:
                   - sem8-net
-              gateway:
-                image: ${DOCKERHUB_USERNAME}/gateway:latest
-                container_name: gateway
-                ports:
-                  - "8080:8080"
-                environment:
-                  SERVER_PORT: 8080
-                  GUIAS_SERVICE_URL: http://guias-service:8090
-                  PRODUCER_URL: http://producer:8081
-                  CONSUMER_URL: http://consumer:8082
-                  AZURE_TENANT_ID: ${AZURE_TENANT_ID}
-                  AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
-                  AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
-                  JAVA_OPTS: "-Xmx120m"
-                depends_on:
-                  - guias-service
-                  - producer
-                  - consumer
-                networks:
-                  - sem8-net
+
             networks:
               sem8-net:
                 driver: bridge
             COMPOSEOF
 
-            echo "=== Descargando imágenes actualizadas ==="
-            docker pull ${DOCKERHUB_USERNAME}/guias-service:latest
-            docker pull ${DOCKERHUB_USERNAME}/producer:latest
-            docker pull ${DOCKERHUB_USERNAME}/consumer:latest
-            docker pull ${DOCKERHUB_USERNAME}/gateway:latest
+            # Descargar imágenes actualizadas
+            docker compose -f docker-compose.prod.yml pull
 
-            echo "=== Deteniendo contenedores anteriores ==="
+            # Bajar stack anterior y levantar nuevo
             docker compose -f docker-compose.prod.yml down || true
+            docker compose -f docker-compose.prod.yml up -d
 
-            echo "=== Levantando stack con docker compose ==="
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            # Limpiar imágenes antiguas
+            docker image prune -f
 
-            echo "=== Esperando que los servicios arranquen (120s) ==="
-            sleep 120
-
-            echo "=== Verificando health check del gateway ==="
-            if ! curl --fail --silent http://localhost:8080/actuator/health; then
-              echo "ERROR: Gateway no responde. Logs:"
-              docker logs gateway --tail 50
-              exit 1
-            fi
+            # Verificar que los contenedores están corriendo
+            docker ps --filter name=guias-service
+            docker ps --filter name=producer
+            docker ps --filter name=consumer
+            docker ps --filter name=rabbitmq
 
             echo ""
             echo "✓ Despliegue exitoso"
-            echo "  Gateway:     http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
-            echo "  RabbitMQ UI: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):15672"
-            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+            echo "  guias-service: http://${PUBLIC_IP}:8080/actuator/health"
+            echo "  producer:      http://${PUBLIC_IP}:8081/actuator/health"
+            echo "  consumer:      http://${PUBLIC_IP}:8082/actuator/health"
+            echo "  RabbitMQ UI:   http://${PUBLIC_IP}:15672"
