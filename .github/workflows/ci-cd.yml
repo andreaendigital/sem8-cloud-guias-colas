@@ -1,0 +1,286 @@
+name: CI/CD Pipeline — Monorepo sem8
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# ─────────────────────────────────────────────────────────────────
+# Variables de entorno globales del pipeline
+# ─────────────────────────────────────────────────────────────────
+env:
+  REGISTRY: docker.io
+  IMAGE_GUIAS:    ${{ secrets.DOCKERHUB_USERNAME }}/guias-service
+  IMAGE_PRODUCER: ${{ secrets.DOCKERHUB_USERNAME }}/producer
+  IMAGE_CONSUMER: ${{ secrets.DOCKERHUB_USERNAME }}/consumer
+  IMAGE_GATEWAY:  ${{ secrets.DOCKERHUB_USERNAME }}/gateway
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Job 1: Build y tests de guias-service
+  # ─────────────────────────────────────────────────────────────
+  build-guias:
+    name: Build guias-service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Tests y empaquetado guias-service
+        run: mvn test package --batch-mode
+        working-directory: guias-service
+
+      - name: Upload JAR guias-service
+        uses: actions/upload-artifact@v4
+        with:
+          name: guias-jar
+          path: guias-service/target/*.jar
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 2: Build y tests de producer
+  # ─────────────────────────────────────────────────────────────
+  build-producer:
+    name: Build producer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Tests y empaquetado producer
+        run: mvn test package --batch-mode
+        working-directory: producer
+
+      - name: Upload JAR producer
+        uses: actions/upload-artifact@v4
+        with:
+          name: producer-jar
+          path: producer/target/*.jar
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 3: Build y tests de consumer
+  # ─────────────────────────────────────────────────────────────
+  build-consumer:
+    name: Build consumer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Tests y empaquetado consumer
+        run: mvn test package --batch-mode
+        working-directory: consumer
+
+      - name: Upload JAR consumer
+        uses: actions/upload-artifact@v4
+        with:
+          name: consumer-jar
+          path: consumer/target/*.jar
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 4: Build y tests de gateway
+  # ─────────────────────────────────────────────────────────────
+  build-gateway:
+    name: Build gateway
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Tests y empaquetado gateway
+        run: mvn test package --batch-mode
+        working-directory: gateway
+
+      - name: Upload JAR gateway
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-jar
+          path: gateway/target/*.jar
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 5: Build y Push de las 4 imágenes Docker a Docker Hub
+  # Solo en push a main (no en PRs)
+  # ─────────────────────────────────────────────────────────────
+  docker-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-guias, build-producer, build-consumer, build-gateway]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login en Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ── guias-service ──
+      - name: Build & Push guias-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./guias-service
+          push: true
+          tags: |
+            ${{ env.IMAGE_GUIAS }}:latest
+            ${{ env.IMAGE_GUIAS }}:${{ github.sha }}
+
+      # ── producer ──
+      - name: Build & Push producer
+        uses: docker/build-push-action@v5
+        with:
+          context: ./producer
+          push: true
+          tags: |
+            ${{ env.IMAGE_PRODUCER }}:latest
+            ${{ env.IMAGE_PRODUCER }}:${{ github.sha }}
+
+      # ── consumer ──
+      - name: Build & Push consumer
+        uses: docker/build-push-action@v5
+        with:
+          context: ./consumer
+          push: true
+          tags: |
+            ${{ env.IMAGE_CONSUMER }}:latest
+            ${{ env.IMAGE_CONSUMER }}:${{ github.sha }}
+
+      # ── gateway ──
+      - name: Build & Push gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: ./gateway
+          push: true
+          tags: |
+            ${{ env.IMAGE_GATEWAY }}:latest
+            ${{ env.IMAGE_GATEWAY }}:${{ github.sha }}
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 6: Deploy en EC2 vía SSH
+  # Descarga las 4 imágenes nuevas y levanta el stack completo
+  # ─────────────────────────────────────────────────────────────
+  deploy-ec2:
+    name: Deploy en EC2
+    runs-on: ubuntu-latest
+    needs: docker-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copiar docker-compose.yml al EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: "docker-compose.yml"
+          target: "/home/${{ secrets.EC2_USER }}/sem8"
+
+      - name: Desplegar stack completo en EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          retry_count: 3
+          retry_wait: 30
+          timeout: 60s
+          command_timeout: 300s
+          script: |
+            set -e
+            cd /home/${{ secrets.EC2_USER }}/sem8
+
+            echo "=== Escribiendo .env con variables de producción ==="
+            cat > .env << 'ENVEOF'
+            DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            DB_URL=${{ secrets.DB_URL }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}
+            AWS_REGION=${{ secrets.AWS_REGION }}
+            S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+            RABBITMQ_HOST=${{ secrets.RABBITMQ_HOST }}
+            RABBITMQ_PORT=5672
+            RABBITMQ_USERNAME=${{ secrets.RABBITMQ_USERNAME }}
+            RABBITMQ_PASSWORD=${{ secrets.RABBITMQ_PASSWORD }}
+            AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
+            AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
+            AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}
+            ENVEOF
+
+            echo "=== Exportando variables Azure al entorno del shell ==="
+            export AZURE_TENANT_ID="${{ secrets.AZURE_TENANT_ID }}"
+            export AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
+            export AZURE_CLIENT_SECRET="${{ secrets.AZURE_CLIENT_SECRET }}"
+
+            echo "=== Descargando imágenes actualizadas ==="
+            docker pull ${{ env.IMAGE_GUIAS }}:latest
+            docker pull ${{ env.IMAGE_PRODUCER }}:latest
+            docker pull ${{ env.IMAGE_CONSUMER }}:latest
+            docker pull ${{ env.IMAGE_GATEWAY }}:latest
+
+            echo "=== Actualizando variables en docker-compose para EC2 ==="
+            # Reemplazar 'build: context:' por 'image:' para usar imágenes de Docker Hub
+            # y ajustar URLs internas para que usen la IP de EC2
+            sed -i "s|build:|#build:|g" docker-compose.yml
+            sed -i "s|#  context:|#  context:|g" docker-compose.yml
+            sed -i "s|#  dockerfile:|#  dockerfile:|g" docker-compose.yml
+
+            # Inyectar image: en cada servicio
+            sed -i "/container_name: guias-service/i\\    image: ${{ env.IMAGE_GUIAS }}:latest" docker-compose.yml
+            sed -i "/container_name: producer/i\\    image: ${{ env.IMAGE_PRODUCER }}:latest" docker-compose.yml
+            sed -i "/container_name: consumer/i\\    image: ${{ env.IMAGE_CONSUMER }}:latest" docker-compose.yml
+            sed -i "/container_name: gateway/i\\    image: ${{ env.IMAGE_GATEWAY }}:latest" docker-compose.yml
+
+            echo "=== Levantando stack con docker-compose ==="
+            docker-compose --env-file .env up -d --remove-orphans
+
+            echo "=== Esperando que los servicios arranquen (60s) ==="
+            sleep 60
+
+            echo "=== Verificando health checks ==="
+            if ! curl --fail --silent http://localhost:8080/actuator/health; then
+              echo "ERROR: Gateway no responde. Logs:"
+              docker logs gateway --tail 50
+              exit 1
+            fi
+
+            echo ""
+            echo "✓ Despliegue exitoso"
+            echo "  Gateway:       http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
+            echo "  RabbitMQ UI:   http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):15672"
+            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

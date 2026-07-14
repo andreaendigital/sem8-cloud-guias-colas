@@ -17,4 +17,5 @@ COPY --from=builder /app/target/consumer-0.0.1-SNAPSHOT.jar app.jar
 
 EXPOSE 8082
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# JAVA_OPTS permite inyectar flags JVM desde docker-compose (ej: -Xmx120m)
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

@@ -4,7 +4,6 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY pom.xml .
-# Descarga dependencias en capa separada (cache)
 RUN mvn dependency:go-offline -B
 COPY src ./src
 RUN mvn package -DskipTests -B
@@ -14,9 +13,9 @@ RUN mvn package -DskipTests -B
 # ─────────────────────────────────────────────
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-COPY --from=builder /app/target/producer-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=builder /app/target/gateway-0.0.1-SNAPSHOT.jar app.jar
 
-EXPOSE 8081
+EXPOSE 8080
 
 # JAVA_OPTS permite inyectar flags JVM desde docker-compose (ej: -Xmx120m)
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

@@ -9,7 +9,7 @@ WORKDIR /app
 COPY target/guias-despacho-*.jar app.jar
 
 # Puerto de la aplicación
-EXPOSE 8080
+EXPOSE 8090
 
-# Punto de entrada
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Punto de entrada — JAVA_OPTS permite inyectar flags JVM desde docker-compose
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
