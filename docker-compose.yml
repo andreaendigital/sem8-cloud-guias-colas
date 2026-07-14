@@ -2,8 +2,7 @@
 
 # =============================================================
 # MONOREPO sem8
-# Servicios: gateway | guias-service | producer | consumer
-#            rabbitmq | localstack
+# Servicios: gateway | guias-service | producer | consumer | rabbitmq
 #
 # Punto de entrada único: http://localhost:8080
 #   /api/v1/guias/**    → guias-service:8090
@@ -41,26 +40,6 @@ services:
       - sem8-net
 
   # -----------------------------------------------------------
-  # LocalStack — simula Amazon S3 localmente (solo dev/local)
-  # En producción se usa S3 real con las credenciales AWS
-  # -----------------------------------------------------------
-  localstack:
-    image: localstack/localstack:3.0
-    container_name: localstack
-    ports:
-      - "4566:4566"
-    environment:
-      SERVICES: s3
-      DEFAULT_REGION: us-east-1
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - sem8-net
-
-  # -----------------------------------------------------------
   # guias-service (puerto INTERNO 8090)
   # Acceso público único via gateway:8080/api/v1/guias/**
   # -----------------------------------------------------------
@@ -75,25 +54,21 @@ services:
       SERVER_PORT: 8090
 
       # ── Base de datos PostgreSQL RDS ──────────────────────
-      # Valores por defecto H2 para desarrollo local.
-      # En producción sobreescribir con los secrets de RDS.
       SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-sa}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-}
-      # Driver y dialecto: PostgreSQL en prod, H2 en local
       SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.h2.Driver}
       JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.H2Dialect}
-      # Alias legacy que usa el application.properties actual
       DB_URL: ${DB_URL:-jdbc:h2:mem:guiasdb;DB_CLOSE_DELAY=-1}
       DB_USERNAME: ${DB_USERNAME:-sa}
       DB_PASSWORD: ${DB_PASSWORD:-}
 
-      # ── AWS S3 ────────────────────────────────────────────
+      # ── AWS S3 (real en prod, credenciales desde secrets) ─
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-test}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-test}
       AWS_REGION: ${AWS_REGION:-us-east-1}
-      AWS_ENDPOINT_OVERRIDE: ${AWS_ENDPOINT_OVERRIDE:-http://localstack:4566}
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-guias-local}
+      AWS_ENDPOINT_OVERRIDE: ${AWS_ENDPOINT_OVERRIDE:-}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-guias-bucket}
 
       # ── EFS / PDF ─────────────────────────────────────────
       EFS_MOUNT_PATH: /tmp/efs-local
@@ -118,8 +93,6 @@ services:
           memory: 200M
     depends_on:
       rabbitmq:
-        condition: service_healthy
-      localstack:
         condition: service_healthy
     volumes:
       - /tmp/efs-local:/tmp/efs-local
@@ -178,15 +151,11 @@ services:
       SERVER_PORT: 8082
 
       # ── Base de datos PostgreSQL RDS ──────────────────────
-      # Valores por defecto H2 para desarrollo local.
-      # En producción sobreescribir con los secrets de RDS.
       SPRING_DATASOURCE_URL: ${DB_URL:-jdbc:h2:mem:consumerdb;DB_CLOSE_DELAY=-1}
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-sa}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-}
-      # Driver y dialecto: PostgreSQL en prod, H2 en local
       SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.h2.Driver}
       JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.H2Dialect}
-      # Alias legacy que usa el application.properties actual
       DB_URL: ${DB_URL:-jdbc:h2:mem:consumerdb;DB_CLOSE_DELAY=-1}
       DB_USERNAME: ${DB_USERNAME:-sa}
       DB_PASSWORD: ${DB_PASSWORD:-}
