@@ -214,8 +214,6 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          retry_count: 3
-          retry_wait: 30
           timeout: 60s
           command_timeout: 300s
           script: |
@@ -269,8 +267,8 @@ jobs:
             docker pull ${{ env.IMAGE_CONSUMER }}:latest
             docker pull ${{ env.IMAGE_GATEWAY }}:latest
 
-            echo "=== Levantando stack con docker-compose ==="
-            docker-compose --env-file .env up -d --remove-orphans
+            echo "=== Levantando stack con docker compose ==="
+            docker compose --env-file .env up -d --remove-orphans
 
             echo "=== Esperando que los servicios arranquen (60s) ==="
             sleep 60

@@ -58,8 +58,6 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          retry_count: 3
-          retry_wait: 30
           timeout: 60s
           command_timeout: 120s
           script: |
