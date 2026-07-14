@@ -197,16 +197,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Copiar docker-compose.prod.yml al EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          source: "docker-compose.prod.yml"
-          target: "/home/ec2-user/sem8"
-
       - name: Desplegar stack completo en EC2
         uses: appleboy/ssh-action@master
         with:
@@ -241,7 +231,7 @@ jobs:
             export AZURE_CLIENT_ID="${{ secrets.AZURE_CLIENT_ID }}"
             export AZURE_CLIENT_SECRET="${{ secrets.AZURE_CLIENT_SECRET }}"
 
-            echo "=== Escribiendo .env para docker-compose ==="
+            echo "=== Escribiendo .env para docker compose ==="
             cat > .env << EOF
             DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
             DB_URL=${DB_URL}
@@ -263,11 +253,139 @@ jobs:
             AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
             EOF
 
+            echo "=== Escribiendo docker-compose.prod.yml en el servidor ==="
+            cat > docker-compose.prod.yml << 'COMPOSEOF'
+            version: '3.9'
+            services:
+              rabbitmq:
+                image: rabbitmq:3-management
+                container_name: rabbitmq
+                ports:
+                  - "5672:5672"
+                  - "15672:15672"
+                environment:
+                  RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+                  RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+                healthcheck:
+                  test: ["CMD", "rabbitmq-diagnostics", "ping"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 10
+                networks:
+                  - sem8-net
+              guias-service:
+                image: ${DOCKERHUB_USERNAME}/guias-service:latest
+                container_name: guias-service
+                ports:
+                  - "8090:8090"
+                environment:
+                  SERVER_PORT: 8090
+                  SPRING_DATASOURCE_URL: ${DB_URL}
+                  SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+                  SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+                  SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.postgresql.Driver}
+                  JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.PostgreSQLDialect}
+                  DB_URL: ${DB_URL}
+                  DB_USERNAME: ${DB_USERNAME}
+                  DB_PASSWORD: ${DB_PASSWORD}
+                  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+                  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+                  AWS_REGION: ${AWS_REGION}
+                  AWS_ENDPOINT_OVERRIDE: ""
+                  S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+                  EFS_MOUNT_PATH: /tmp/efs-local
+                  PDF_ASYNC_POOL_SIZE: 4
+                  RABBITMQ_HOST: rabbitmq
+                  RABBITMQ_PORT: 5672
+                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+                  AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+                  AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+                  AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+                  JAVA_OPTS: "-XX:MaxRAMPercentage=75.0 -Xmx160m"
+                depends_on:
+                  rabbitmq:
+                    condition: service_healthy
+                networks:
+                  - sem8-net
+              producer:
+                image: ${DOCKERHUB_USERNAME}/producer:latest
+                container_name: producer
+                ports:
+                  - "8081:8081"
+                environment:
+                  SERVER_PORT: 8081
+                  RABBITMQ_HOST: rabbitmq
+                  RABBITMQ_PORT: 5672
+                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+                  AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+                  AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+                  AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+                  JAVA_OPTS: "-Xmx120m"
+                depends_on:
+                  rabbitmq:
+                    condition: service_healthy
+                networks:
+                  - sem8-net
+              consumer:
+                image: ${DOCKERHUB_USERNAME}/consumer:latest
+                container_name: consumer
+                ports:
+                  - "8082:8082"
+                environment:
+                  SERVER_PORT: 8082
+                  SPRING_DATASOURCE_URL: ${DB_URL}
+                  SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+                  SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+                  SPRING_DATASOURCE_DRIVER: ${DB_DRIVER:-org.postgresql.Driver}
+                  JPA_DIALECT: ${DB_DIALECT:-org.hibernate.dialect.PostgreSQLDialect}
+                  DB_URL: ${DB_URL}
+                  DB_USERNAME: ${DB_USERNAME}
+                  DB_PASSWORD: ${DB_PASSWORD}
+                  RABBITMQ_HOST: rabbitmq
+                  RABBITMQ_PORT: 5672
+                  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+                  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+                  AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+                  AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+                  AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+                  JAVA_OPTS: "-Xmx120m"
+                depends_on:
+                  rabbitmq:
+                    condition: service_healthy
+                networks:
+                  - sem8-net
+              gateway:
+                image: ${DOCKERHUB_USERNAME}/gateway:latest
+                container_name: gateway
+                ports:
+                  - "8080:8080"
+                environment:
+                  SERVER_PORT: 8080
+                  GUIAS_SERVICE_URL: http://guias-service:8090
+                  PRODUCER_URL: http://producer:8081
+                  CONSUMER_URL: http://consumer:8082
+                  AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+                  AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+                  AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET}
+                  JAVA_OPTS: "-Xmx120m"
+                depends_on:
+                  - guias-service
+                  - producer
+                  - consumer
+                networks:
+                  - sem8-net
+            networks:
+              sem8-net:
+                driver: bridge
+            COMPOSEOF
+
             echo "=== Descargando imágenes actualizadas ==="
-            docker pull ${{ env.IMAGE_GUIAS }}:latest
-            docker pull ${{ env.IMAGE_PRODUCER }}:latest
-            docker pull ${{ env.IMAGE_CONSUMER }}:latest
-            docker pull ${{ env.IMAGE_GATEWAY }}:latest
+            docker pull ${DOCKERHUB_USERNAME}/guias-service:latest
+            docker pull ${DOCKERHUB_USERNAME}/producer:latest
+            docker pull ${DOCKERHUB_USERNAME}/consumer:latest
+            docker pull ${DOCKERHUB_USERNAME}/gateway:latest
 
             echo "=== Verificando e instalando docker compose plugin si es necesario ==="
             if ! docker compose version &>/dev/null 2>&1; then
