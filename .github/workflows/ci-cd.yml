@@ -267,6 +267,19 @@ jobs:
             docker pull ${{ env.IMAGE_CONSUMER }}:latest
             docker pull ${{ env.IMAGE_GATEWAY }}:latest
 
+            echo "=== Verificando e instalando docker compose plugin si es necesario ==="
+            if ! docker compose version &>/dev/null 2>&1; then
+              echo "docker compose plugin no encontrado, instalando..."
+              sudo curl -SL https://github.com/docker/compose/releases/download/v2.24.0/docker-compose-linux-x86_64 \
+                -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo ln -sf /usr/local/bin/docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+              echo "Instalación completada: $(docker compose version)"
+            else
+              echo "docker compose ya disponible: $(docker compose version)"
+            fi
+
             echo "=== Levantando stack con docker compose ==="
             docker compose up -d --remove-orphans
 
