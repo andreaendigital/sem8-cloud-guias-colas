@@ -282,6 +282,9 @@ jobs:
               echo "docker compose ya disponible: $(docker compose version)"
             fi
 
+            echo "=== Deteniendo contenedores anteriores ==="
+            docker compose -f docker-compose.prod.yml down || true
+
             echo "=== Levantando stack con docker compose ==="
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
